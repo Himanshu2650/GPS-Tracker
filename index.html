@@ -1,0 +1,232 @@
+<!--<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>QR Walk Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YAIzaSyDcnruTEV42C6rCNisqJ9NtbuG6CUGQ6sI&libraries=places"></script>
+    <style>
+        body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
+        .container { max-width: 500px; margin-top: 50px; }
+        .btn { width: 100%; margin-bottom: 10px; }
+        #reader { width: 100%; margin: 20px 0; display: none; }
+    </style>
+</head>
+<body>
+<div class="container text-center">
+    <h2 class="mb-4">QR Walk Tracker</h2>
+    <div class="alert alert-info" id="message" style="display:none;"></div>
+
+    <button class="btn btn-success" onclick="startWalk()">Start Walk</button>
+    <button class="btn btn-primary" onclick="scanQR()">Scan QR</button>
+    <button class="btn btn-danger" onclick="submitWalk()">Submit</button>
+
+    <div id="reader"></div>
+</div>
+<script src="/static/script.js"></script>
+</body>
+</html> -->
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Walk Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #e0f7fa, #b2ebf2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        h1 {
+            color: #00796b;
+            font-size: 2.5rem;
+            margin-bottom: 40px;
+        }
+
+        .btn {
+            background-color: #00796b;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1rem;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background-color: #004d40;
+            transform: scale(1.05);
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        #message {
+            margin-top: 20px;
+            width: 90%;
+            max-width: 500px;
+        }
+
+        .alert {
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            margin-top: 10px;
+        }
+
+        .alert-info { background-color: #e0f7fa; color: #00796b; }
+        .alert-success { background-color: #c8e6c9; color: #2e7d32; }
+        .alert-danger { background-color: #ffcdd2; color: #c62828; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚶‍♂️ Walk Tracker</h1>
+        <button class="btn" onclick="startWalk()">📍 Start Walk</button>
+        <button class="btn" onclick="stopWalk()">🛑 Stop Walk</button>
+        <button class="btn" onclick="submitWalk()">📤 Submit Walk</button>
+        <div id="message"></div>
+    </div>
+
+<script>
+let watchId = null;
+let messageTimeout = null;
+let hasStarted = false;
+
+function showMessage(msg, type = "info", duration = 3000) {
+    const messageDiv = document.getElementById('message');
+    messageDiv.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+
+    if (messageTimeout) clearTimeout(messageTimeout);
+
+    messageTimeout = setTimeout(() => {
+        messageDiv.innerHTML = '';
+    }, duration);
+}
+
+function startWalk() {
+    if (!navigator.geolocation) {
+        showMessage("❌ Geolocation not supported.", "danger");
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        function (position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+
+            fetch('/start_walk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lat: lat, lon: lon })
+            })
+            .then(res => res.json())
+            .then(data => {
+                console.log(data.message);
+                showMessage("✅ Walk started. Tracking your route...", "success");
+
+                watchId = navigator.geolocation.watchPosition(
+                    savePosition,
+                    errorCallback,
+                    {
+                        enableHighAccuracy: true,
+                        maximumAge: 0,
+                        timeout: 5000
+                    }
+                );
+                hasStarted = true;
+            })
+            .catch(err => {
+                console.error("Failed to start walk:", err);
+                showMessage("❌ Failed to start walk.", "danger");
+            });
+        },
+        errorCallback,
+        { enableHighAccuracy: true }
+    );
+}
+
+function savePosition(position) {
+    if (!hasStarted) return;
+
+    const lat = position.coords.latitude;
+    const lon = position.coords.longitude;
+    const timestamp = new Date().toLocaleString();
+
+    fetch('/save_position', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat: lat, lon: lon, timestamp: timestamp })
+    })
+    .then(res => res.text())
+    .then(data => {
+        console.log("Position saved:", data);
+    })
+    .catch(err => {
+        console.error("Saving position failed:", err);
+        showMessage("❌ Could not save position.", "danger");
+    });
+}
+
+function stopWalk() {
+    if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        hasStarted = false;
+        showMessage("🛑 Walk tracking stopped.", "info");
+    }
+}
+
+function submitWalk() {
+    fetch('/submit_walk', { method: 'POST' })
+        .then(res => res.text())
+        .then(data => {
+            showMessage("✅ Walk report generated. Opening map...", "success");
+            setTimeout(() => {
+                window.open('/static/walk_map.png', '_blank');
+            }, 1000);
+        })
+        .catch(err => {
+            console.error("Submit failed:", err);
+            showMessage("❌ Could not generate walk report.", "danger");
+        });
+}
+
+function errorCallback(error) {
+    let message = '';
+    switch (error.code) {
+        case error.PERMISSION_DENIED:
+            message = "User denied the request for Geolocation.";
+            break;
+        case error.POSITION_UNAVAILABLE:
+            message = "Location information is unavailable.";
+            break;
+        case error.TIMEOUT:
+            message = "The request to get user location timed out.";
+            break;
+        default:
+            message = "An unknown error occurred.";
+            break;
+    }
+    showMessage(`❌ ${message}`, "danger");
+}
+</script>
+</body>
+</html>
+
+
