@@ -212,6 +212,27 @@ function errorCallback(error) {
     showMessage(`❌ ${message}`, "danger");
 }
 
+// function stopWalk() {
+//     if (watchId !== null) {
+//         navigator.geolocation.clearWatch(watchId);
+//         watchId = null;
+//         hasStarted = false;
+//     }
+
+//     fetch('/submit_walk', { method: 'POST' })
+//         .then(response => {
+//             if (!response.ok) throw new Error('Network response was not ok');
+//             return response.text();
+//         })
+//         .then(data => {
+//             showMessage("✅ Walk route map generated! Opening map...", "success");
+            
+//         })
+//         .catch(error => {
+//             console.error('Generating walk map failed:', error);
+//             showMessage("❌ Failed to generate walk map.", "danger");
+//         });
+
 function stopWalk() {
     if (watchId !== null) {
         navigator.geolocation.clearWatch(watchId);
@@ -225,11 +246,12 @@ function stopWalk() {
             return response.text();
         })
         .then(data => {
-            showMessage("✅ Walk route map generated! Opening map...", "success");
-            
+            // ✅ Message only — no map opened
+            showMessage("✅ Walk route map generated and emailed successfully!", "success");
         })
         .catch(error => {
             console.error('Generating walk map failed:', error);
             showMessage("❌ Failed to generate walk map.", "danger");
         });
 }
+
